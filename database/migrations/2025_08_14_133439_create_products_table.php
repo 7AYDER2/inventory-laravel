@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('sku')->unique();// the code of the product
             $table->string('category')->nullable();
-            $table->decimal('cost_price', 12, 2)->default(0);
+            $table->decimal('cost_price', 12, 2)->default(0); // 10,0 number of digits and 2 decimal places
             $table->decimal('selling_price', 12, 2)->default(0);
             $table->integer('quantity_in_stock')->default(0);
             $table->integer('min_stock')->default(0);

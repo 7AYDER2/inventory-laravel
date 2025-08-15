@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreProductRequest;
+use App\Http\Requests\UpdateProductRequest;
+use App\Http\Requests\AdjustStockRequest;
+use App\Http\Resources\ProductResource;
+use App\Models\Product;
+use App\Services\InventoryServices;
 
 class ProductController extends Controller
 {
@@ -11,55 +16,41 @@ class ProductController extends Controller
      */
     public function index()
     {
-        return Product::query()
-            ->when(request('search'), fn($search) => $search->where('name','like','%'.request('search').'%')
-                                             ->orWhere('sku','like','%'.request('search').'%'))
+        $products = Product::query()
+            ->when(request('search'), fn($query) => $query->where('name', 'like', '%' . request('search') . '%')
+                                             ->orWhere('sku', 'like', '%' . request('search') . '%'))
             ->orderByDesc('id')
             ->paginate(20);
+            
+        return ProductResource::collection($products);
     }
-
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreProductRequest $request)
     {
-        $data = $request->validate([
-            'name'=>'required|string|max:255',
-            'sku'=>'required|string|max:100|unique:products,sku',
-            'category'=>'nullable|string|max:100',
-            'cost_price'=>'required|numeric|min:0',
-            'selling_price'=>'required|numeric|min:0',
-            'quantity_in_stock'=>'integer|min:0',
-            'min_stock'=>'integer|min:0',
-        ]);
-
+        $data = $request->validated();
         $product = Product::create($data);
-        return response()->json($product, 201);
+        return new ProductResource($product);
     }
 
     /**
      * Display the specified resource.
      */
-      public function show(Product $product) { return $product; }
-
+    public function show(Product $product)
+    {
+        return new ProductResource($product);
+    }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Product $product)
+    public function update(UpdateProductRequest $request, Product $product)
     {
-        $data = $request->validate([
-            'name'=>'sometimes|required|string|max:255',
-            'sku'=>"sometimes|required|string|max:100|unique:products,sku,{$product->id}",
-            'category'=>'nullable|string|max:100',
-            'cost_price'=>'sometimes|required|numeric|min:0',
-            'selling_price'=>'sometimes|required|numeric|min:0',
-            'min_stock'=>'sometimes|integer|min:0',
-        ]);
-
+        $data = $request->validated();
         $product->update($data);
-        return $product;
+        return new ProductResource($product);
     }
 
     public function destroy(Product $product)
@@ -68,14 +59,14 @@ class ProductController extends Controller
         return response()->noContent();
     }
 
-    public function adjust(Request $request, Product $product, InventoryService $svc)
+    public function adjust(AdjustStockRequest $request, Product $product, InventoryServices $svc)
     {
-        $data = $request->validate([
-            'delta' => 'required|integer',
-            'note'  => 'nullable|string'
-        ]);
-
+        $data = $request->validated();
         $movement = $svc->adjust($product, $data['delta'], $data['note'] ?? null);
-        return response()->json(['product'=>$product->fresh(),'movement'=>$movement]);
+        
+        return response()->json([
+            'product' => new ProductResource($product->fresh()),
+            'movement' => $movement
+        ]);
     }
 }

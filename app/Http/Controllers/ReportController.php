@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Resources\StockValueResource;
+use App\Http\Resources\TopProductResource;
+use App\Http\Resources\ProductResource;
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -11,22 +15,28 @@ class ReportController extends Controller
         // Sum of quantity_in_stock * cost_price and selling_price for potential value
         $valueAtCost = Product::sum(DB::raw('quantity_in_stock * cost_price'));
         $valueAtSell = Product::sum(DB::raw('quantity_in_stock * selling_price'));
-        return compact('valueAtCost','valueAtSell');
+        
+        return new StockValueResource(compact('valueAtCost', 'valueAtSell'));
     }
 
     public function lowStock()
     {
-        return Product::whereColumn('quantity_in_stock','<=','min_stock')
-            ->orderBy('quantity_in_stock')->get();
+        $products = Product::whereColumn('quantity_in_stock', '<=', 'min_stock')
+            ->orderBy('quantity_in_stock')
+            ->get();
+            
+        return ProductResource::collection($products);
     }
 
     public function topProducts()
     {
-        return \DB::table('sale_items')
+        $topProducts = DB::table('sale_items')
             ->select('product_id', DB::raw('SUM(quantity) as qty_sold'), DB::raw('SUM(line_total) as revenue'))
             ->groupBy('product_id')
             ->orderByDesc('qty_sold')
             ->limit(10)
             ->get();
+            
+        return TopProductResource::collection($topProducts);
     }
 }
